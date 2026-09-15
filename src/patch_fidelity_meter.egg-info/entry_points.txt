@@ -1,0 +1,2 @@
+[console_scripts]
+patch-fidelity-meter = patch_fidelity_meter.cli:main

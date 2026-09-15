@@ -1,0 +1,17 @@
+LICENSE
+README.md
+pyproject.toml
+src/patch_fidelity_meter/__init__.py
+src/patch_fidelity_meter/__main__.py
+src/patch_fidelity_meter/cli.py
+src/patch_fidelity_meter/scoring.py
+src/patch_fidelity_meter.egg-info/PKG-INFO
+src/patch_fidelity_meter.egg-info/SOURCES.txt
+src/patch_fidelity_meter.egg-info/dependency_links.txt
+src/patch_fidelity_meter.egg-info/entry_points.txt
+src/patch_fidelity_meter.egg-info/requires.txt
+src/patch_fidelity_meter.egg-info/top_level.txt
+tests/test_cli.py
+tests/test_examples.py
+tests/test_parser.py
+tests/test_scoring.py

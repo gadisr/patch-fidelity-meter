@@ -1,0 +1,11 @@
+--- a/hello.py
++++ b/hello.py
+@@ -1,5 +1,6 @@
+ def greet(name):
+-    return "Hello, " + name
+-    
++    return f"Hello, {name}!"
++
++# Added unnecessary comment
+ def main():
+     print(greet("World"))
