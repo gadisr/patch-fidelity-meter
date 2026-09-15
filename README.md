@@ -1,10 +1,6 @@
 # patch-fidelity-meter
 
-Score patches vs minimal oracle diff (bloat/sprawl/unrelated hunks). No LLM.
-
-## Purpose
-
-Measure how well a candidate patch (e.g., from an AI agent or model) matches a minimal oracle diff. Quantify bloat, sprawl, and unrelated changes using pure diff analysis—no LLM required.
+**Quantify patch fidelity for coding-agent evaluation.** Score any candidate patch against a minimal oracle diff, measuring bloat (unnecessary changes), sprawl (extra files touched), and unrelated hunks. Pure diff analysis using stdlib—no LLM, no black-box scoring. Designed for benchmarks, agent harnesses, and CI quality gates where you need objective, reproducible patch quality metrics.
 
 ## Installation
 
@@ -136,40 +132,81 @@ patch-fidelity-meter score \
 
 ## Use Cases
 
-### CI/CD Quality Gates
+### 1. SWE-bench Patch Quality Gate
 
-Enforce minimum fidelity thresholds in your CI pipeline:
+Reject candidates that sprawl beyond the minimal fix. Given a gold-standard patch for SWE-bench task `django/django#12345`, score each agent's submission:
 
 ```bash
-# Exit code 1 if fidelity < 0.8
+# Extract minimal fix from gold patch
 patch-fidelity-meter score \
-  --oracle minimal.patch \
-  --candidate agent-generated.patch \
-  --min-fidelity 0.8
+  --oracle swebench/django-12345-minimal.patch \
+  --candidate agent-submissions/gpt-4.patch \
+  --min-fidelity 0.75
+
+# Exit code 1 if fidelity < 0.75
 ```
 
-### Agent/Model Evaluation
+**Example: sprawl detection**
+```diff
+Oracle touches: src/django/db/models/query.py
+Candidate touches: src/django/db/models/query.py, tests/fixtures/data.json
+Sprawl: 1 → fidelity drops, flags unnecessary test fixture change
+```
 
-Compare AI-generated patches against human-curated minimal changes:
+### 2. Meta-Harness Edit Bloat Comparison
+
+Track precision regression across agent versions. Compare edit bloat when evolving a coding harness:
 
 ```bash
-# Batch scoring
-for candidate in candidates/*.patch; do
-  patch-fidelity-meter score \
-    --oracle oracle.patch \
-    --candidate "$candidate" \
-    --json >> results.jsonl
+# Score agent v1 vs v2 on the same task set
+for task in tasks/*.json; do
+  oracle="oracles/$(basename $task .json).patch"
+  
+  patch-fidelity-meter score --oracle "$oracle" \
+    --candidate "v1-output/$(basename $task .json).patch" \
+    --json | jq -r '.bloat' >> v1-bloat.txt
+  
+  patch-fidelity-meter score --oracle "$oracle" \
+    --candidate "v2-output/$(basename $task .json).patch" \
+    --json | jq -r '.bloat' >> v2-bloat.txt
 done
+
+# Compare: mean bloat v1 vs v2
+paste v1-bloat.txt v2-bloat.txt | awk '{sum1+=$1; sum2+=$2; n++} END {print "v1:", sum1/n, "v2:", sum2/n}'
 ```
 
-### Code Review Assistance
+**Example output:**
+```
+v1: 0.42  v2: 0.31  →  26% bloat reduction
+```
 
-Quantify how much "extra" a pull request changes beyond what's necessary:
+### 3. CI Scoreboard: Reject Sprawling PRs
 
-```bash
-git diff main...feature-branch > feature.patch
-git diff main...minimal-fix > minimal.patch
-patch-fidelity-meter score --oracle minimal.patch --candidate feature.patch
+Add a CI check that fails when a PR touches unrelated files:
+
+```yaml
+# .github/workflows/patch-fidelity.yml
+- name: Check patch fidelity
+  run: |
+    git diff origin/main...HEAD > candidate.patch
+    patch-fidelity-meter score \
+      --oracle minimal-expected.patch \
+      --candidate candidate.patch \
+      --json | tee fidelity.json
+    
+    sprawl=$(jq -r '.sprawl' fidelity.json)
+    if [ "$sprawl" -gt 0 ]; then
+      echo "❌ PR touches $sprawl unrelated files"
+      exit 1
+    fi
+```
+
+**Example: prevent accidental changes**
+```
+Task: Fix auth bug in auth/login.py
+Oracle: auth/login.py
+Candidate: auth/login.py, static/css/styles.css, README.md
+→ Sprawl = 2, CI fails with clear message
 ```
 
 ## Output Formats
@@ -261,6 +298,22 @@ When both patches are empty, all metrics return 1.0 (perfect score).
 ## License
 
 MIT License - see [LICENSE](LICENSE) file.
+
+## With failstrata
+
+When integrated into [failstrata](https://github.com/your-org/failstrata) or cursor-audit-cycle workflows, use `patch-fidelity-meter` to score agent iterations automatically:
+
+```bash
+# In failstrata harness: score each attempt
+patch-fidelity-meter score \
+  --oracle "${ORACLE_PATCH}" \
+  --candidate "${AGENT_OUTPUT_PATCH}" \
+  --json > "${ATTEMPT_DIR}/fidelity.json"
+
+# Surface bloat and sprawl in the failstrata summary
+```
+
+The tool outputs structured JSON that failstrata can aggregate across iterations, surfacing regressions in edit quality.
 
 ## Contributing
 
