@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Run tests
+      run: |
+        pytest -v --cov=patch_fidelity_meter --cov-report=term-missing
+    
+    - name: Test CLI installation
+      run: |
+        patch-fidelity-meter --help
+        python -m patch_fidelity_meter --help
+    
+    - name: Test with example files
+      run: |
+        patch-fidelity-meter score \
+          --oracle examples/oracle_simple.patch \
+          --candidate examples/candidate_exact_match.patch
+        
+        patch-fidelity-meter score \
+          --oracle examples/oracle_simple.patch \
+          --candidate examples/candidate_exact_match.patch \
+          --json
+        
+        patch-fidelity-meter score \
+          --oracle examples/oracle_simple.patch \
+          --candidate examples/candidate_exact_match.patch \
+          --min-fidelity 0.9
